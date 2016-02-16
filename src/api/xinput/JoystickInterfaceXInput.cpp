@@ -30,6 +30,32 @@ using namespace JOYSTICK;
 
 #define MAX_JOYSTICKS 4
 
+static JOYSTICK_BATTERY_LEVEL ExtractBatteryLevel(const XINPUT_BATTERY_INFORMATION& batteryInfo)
+{
+  if (batteryInfo.BatteryType != BATTERY_TYPE_ALKALINE && batteryInfo.BatteryType != BATTERY_TYPE_NIMH)
+    return JOYSTICK_BATTERY_LEVEL_NOTSUPPORTED;
+
+  switch (batteryInfo.BatteryLevel)
+  {
+    case BATTERY_LEVEL_EMPTY:
+      return JOYSTICK_BATTERY_LEVEL_EMPTY;
+
+    case BATTERY_LEVEL_LOW:
+      return JOYSTICK_BATTERY_LEVEL_LOW;
+
+    case BATTERY_LEVEL_MEDIUM:
+      return JOYSTICK_BATTERY_LEVEL_MEDIUM;
+
+    case BATTERY_LEVEL_FULL:
+      return JOYSTICK_BATTERY_LEVEL_FULL;
+
+    default:
+      break;
+  }
+
+  return JOYSTICK_BATTERY_LEVEL_NOTSUPPORTED;
+}
+
 const char* CJoystickInterfaceXInput::Name(void) const
 {
   return INTERFACE_XINPUT;
@@ -55,7 +81,15 @@ bool CJoystickInterfaceXInput::ScanForJoysticks(JoystickVector& joysticks)
       continue;
 
     isyslog("Found a XInput controller on port %u", i);
-    joysticks.push_back(JoystickPtr(new CJoystickXInput(i)));
+    // create the XInput joystick
+    JoystickPtr joystick = JoystickPtr(new CJoystickXInput(i));
+
+    // get the battery information for the XInput joystick
+    XINPUT_BATTERY_INFORMATION batteryInfo;
+    if (CXInputDLL::Get().GetBatteryInformation(i, CXInputDLL::BatteryDeviceType::Controller, batteryInfo))
+      joystick->SetBatteryLevel(ExtractBatteryLevel(batteryInfo));
+
+    joysticks.push_back(joystick);
   }
 
   return true;
